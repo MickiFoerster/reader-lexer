@@ -11,12 +11,20 @@ typedef struct {
 int pipe_to_reader[2];
 
 unsigned char lexer_input[8];
-size_t lexer_input_in = 0;
+size_t lexer_input_in = 1;
 size_t lexer_input_out = 0;
 pthread_mutex_t lexer_input_mtx = PTHREAD_MUTEX_INITIALIZER;
 
 static void fill_buffer(unsigned char *buf, size_t n) {
-  // write n bytes into lexer_input
+    for (size_t i=0; i<n; ++i) {
+        lexer_input[lexer_input_in++] = buf[i];
+        lexer_input_in = lexer_input_in % 
+            (sizeof(lexer_input)/sizeof(lexer_input[0]));
+        while(lexer_input_in==lexer_input_out) {
+            fprintf(stderr, "waiting for consumer ...\n");
+            sleep(1);
+        }
+    }
 }
 
 void *reader_task(void *argv) {

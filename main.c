@@ -18,6 +18,8 @@ static void *timeout(void *argv) {
   return NULL;
 }
 
+int lexer(void);
+
 int main() {
   pthread_t tid_reader;
   pthread_t tid_timeout;
@@ -41,6 +43,11 @@ int main() {
   if (rc != 0) {
     perror("pthread_create() for timeout failed");
     exit(EXIT_FAILURE);
+  }
+
+  for (;;) {
+      fprintf(stderr, "lexer returned %d\n", lexer());
+      sleep(1);
   }
 
   rc = pthread_join(tid_reader, NULL);
