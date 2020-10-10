@@ -1,12 +1,15 @@
 #include <pthread.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 #include "reader.h"
 
+bool timeout_occurred = false;
+
 static void *timeout(void *argv) {
-  sleep(60);
+  sleep(2);
   fprintf(stderr, "Signal thread to terminate\n");
   ssize_t n = write(pipe_to_reader[PIPE_WRITE], "", 1);
   if (n < 0) {
@@ -14,7 +17,7 @@ static void *timeout(void *argv) {
     exit(EXIT_FAILURE);
   }
   fprintf(stderr, "write() wrote %ld bytes\n", n);
-
+  timeout_occurred = true;
   fprintf(stderr, "timout: thread terminates ...\n");
   return NULL;
 }
@@ -46,7 +49,7 @@ int main() {
     exit(EXIT_FAILURE);
   }
 
-  for (;;) {
+  for (; !timeout_occurred;) {
     fprintf(stderr, "lexer returned %d\n", lexer());
   }
 

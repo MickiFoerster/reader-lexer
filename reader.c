@@ -1,4 +1,6 @@
+#include <assert.h>
 #include <pthread.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <sys/epoll.h>
 #include <unistd.h>
@@ -9,33 +11,75 @@ typedef struct {
 } reader_args_t;
 
 int pipe_to_reader[2];
+extern bool timeout_occurred;
 
-extern unsigned char lexer_input[8];
-extern size_t lexer_input_in;
-extern size_t lexer_input_out;
-extern pthread_mutex_t lexer_input_mtx;
-extern pthread_cond_t lexer_input_available;
-extern pthread_cond_t lexer_input_fillable;
+typedef struct {
+  unsigned char buf[8];
+  size_t in;
+  size_t out;
+  pthread_mutex_t mtx;
+  pthread_cond_t cond_input_available;
+  pthread_cond_t condinput_fillable;
+} lexer_input_t;
+
+lexer_input_t lexer_input = {.in = 1,
+                             .out = 0,
+                             .mtx = PTHREAD_MUTEX_INITIALIZER,
+                             .cond_input_available = PTHREAD_COND_INITIALIZER,
+                             .condinput_fillable = PTHREAD_COND_INITIALIZER};
+
+int lexer(void) {
+  pthread_mutex_lock(&lexer_input.mtx);
+  {
+    size_t j;
+    for (; !timeout_occurred;) {
+      j = (lexer_input.out + 1) %
+          (sizeof(lexer_input.buf) / sizeof(lexer_input.buf[0]));
+      if (j != lexer_input.in) {
+        break;
+      }
+      pthread_cond_wait(&lexer_input.cond_input_available, &lexer_input.mtx);
+    }
+
+    for (; !timeout_occurred;) {
+      size_t i = (lexer_input.out + 1) %
+                 (sizeof(lexer_input.buf) / sizeof(lexer_input.buf[0]));
+      if (i == lexer_input.in) {
+        fprintf(stderr, "\n");
+        break;
+      }
+      fprintf(stderr, "%c", lexer_input.buf[i]);
+      lexer_input.out = i;
+    }
+    pthread_cond_signal(&lexer_input.condinput_fillable);
+  }
+  pthread_mutex_unlock(&lexer_input.mtx);
+
+  if (timeout_occurred) {
+    return -1;
+  }
+  return 0;
+}
 
 static void fill_lexer_buffer(unsigned char *buf, size_t n) {
   fprintf(stderr, "fill_lexer_buffer() starts\n");
   for (size_t i = 0; i < n; ++i) {
-    pthread_mutex_lock(&lexer_input_mtx);
+    pthread_mutex_lock(&lexer_input.mtx);
     {
       size_t j;
       for (;;) {
-        j = (lexer_input_in + 1) %
-            (sizeof(lexer_input) / sizeof(lexer_input[0]));
-        if (j != lexer_input_out) {
+        j = (lexer_input.in + 1) %
+            (sizeof(lexer_input.buf) / sizeof(lexer_input.buf[0]));
+        if (j != lexer_input.out) {
           break;
         }
-        pthread_cond_wait(&lexer_input_fillable, &lexer_input_mtx);
+        pthread_cond_wait(&lexer_input.condinput_fillable, &lexer_input.mtx);
       }
-      lexer_input[j] = buf[i];
-      lexer_input_in = j;
-      pthread_cond_signal(&lexer_input_available);
+      lexer_input.buf[j] = buf[i];
+      lexer_input.in = j;
+      pthread_cond_signal(&lexer_input.cond_input_available);
     }
-    pthread_mutex_unlock(&lexer_input_mtx);
+    pthread_mutex_unlock(&lexer_input.mtx);
   }
   fprintf(stderr, "fill_lexer_buffer() ends\n");
 }
@@ -58,21 +102,21 @@ void *reader_task(void *argv) {
     for (int i = 0; i < nfds; ++i) {
       if (events[i].data.fd == arg->turnoff) {
         close(arg->input);
+        pthread_cond_signal(&lexer_input.cond_input_available);
+        fprintf(stderr, "reader: thread terminates ...\n");
         return NULL;
       }
-      // fprintf(stderr, "fd %d can be read\n", events[i].data.fd);
+      fprintf(stderr, "fd %d can be read\n", events[i].data.fd);
       unsigned char buf[4096];
       ssize_t n = read(events[i].data.fd, buf, sizeof(buf));
-      // fprintf(stderr, "read() returned %ld bytes\n", n);
+      fprintf(stderr, "read() returned %ld bytes\n", n);
       if (n > 0) {
         fill_lexer_buffer(buf, n);
       }
     }
   }
 
-  fprintf(stderr, "reader: thread terminates ...\n");
+  assert(0 && "This point will never be reached");
+
   return NULL;
 }
-
-void wait_for_reader(void) {}
-

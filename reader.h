@@ -14,4 +14,3 @@ typedef struct {
 extern int pipe_to_reader[2];
 
 void *reader_task(void *argv);
-void wait_for_reader(void);
