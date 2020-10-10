@@ -90,7 +90,7 @@ int lexer(void) {
       return -1;
     }
   }
-  return 0;
+  return pattern_matches;
 }
 
 static void fill_lexer_buffer(unsigned char *buf, size_t n) {
