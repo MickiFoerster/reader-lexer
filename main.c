@@ -6,7 +6,7 @@
 #include "reader.h"
 
 static void *timeout(void *argv) {
-  sleep(10);
+  sleep(60);
   fprintf(stderr, "Signal thread to terminate\n");
   ssize_t n = write(pipe_to_reader[PIPE_WRITE], "", 1);
   if (n < 0) {
@@ -15,6 +15,7 @@ static void *timeout(void *argv) {
   }
   fprintf(stderr, "write() wrote %ld bytes\n", n);
 
+  fprintf(stderr, "timout: thread terminates ...\n");
   return NULL;
 }
 
@@ -47,7 +48,6 @@ int main() {
 
   for (;;) {
       fprintf(stderr, "lexer returned %d\n", lexer());
-      sleep(1);
   }
 
   rc = pthread_join(tid_reader, NULL);

@@ -16,12 +16,40 @@ pattern_t patterns[2] = {
     {.pattern = "AAAA", .handler = NULL, .match_idx = 0}};
 const unsigned num_patterns = sizeof(patterns)/sizeof(patterns[0]);
 
+unsigned char lexer_input[8];
+size_t lexer_input_in = 1;
+size_t lexer_input_out = 0;
+pthread_mutex_t lexer_input_mtx = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t lexer_input_available = PTHREAD_COND_INITIALIZER;
+pthread_cond_t lexer_input_fillable = PTHREAD_COND_INITIALIZER;
+
 int lexer(void) {
-  fprintf(stderr, "in : %ld\n", lexer_input_in);
-  fprintf(stderr, "out: %ld\n", lexer_input_out);
-  for (int i = 0; i < sizeof(lexer_input); ++i) {
-    fprintf(stderr, "%c", lexer_input[i]);
-  }
+    pthread_mutex_lock(&lexer_input_mtx);
+    {
+        size_t j;
+        for (;;) {
+            j = (lexer_input_out+1) % 
+                (sizeof(lexer_input)/sizeof(lexer_input[0]));
+            if (j!=lexer_input_in) {
+                break;
+            }
+            pthread_cond_wait(&lexer_input_available, &lexer_input_mtx);
+        }
+
+        for(;;) {
+            size_t i = (lexer_input_out+1) % (sizeof(lexer_input)/sizeof(lexer_input[0]));
+            if (i==lexer_input_in) {
+                break;
+            }
+            fprintf(stderr, "%c", lexer_input[i]);
+            lexer_input_out = i;
+        }
+        fprintf(stderr, "\n");
+
+        pthread_cond_signal(&lexer_input_fillable);
+    }
+    pthread_mutex_unlock(&lexer_input_mtx);
+
   return 0;
 #if 0
   /*

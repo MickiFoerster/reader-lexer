@@ -10,21 +10,34 @@ typedef struct {
 
 int pipe_to_reader[2];
 
-unsigned char lexer_input[8];
-size_t lexer_input_in = 1;
-size_t lexer_input_out = 0;
-pthread_mutex_t lexer_input_mtx = PTHREAD_MUTEX_INITIALIZER;
+extern unsigned char lexer_input[8];
+extern size_t lexer_input_in;
+extern size_t lexer_input_out;
+extern pthread_mutex_t lexer_input_mtx;
+extern pthread_cond_t lexer_input_available;
+extern pthread_cond_t lexer_input_fillable;
 
 static void fill_buffer(unsigned char *buf, size_t n) {
+    fprintf(stderr, "fill_buffer() starts\n");
     for (size_t i=0; i<n; ++i) {
-        lexer_input[lexer_input_in++] = buf[i];
-        lexer_input_in = lexer_input_in % 
-            (sizeof(lexer_input)/sizeof(lexer_input[0]));
-        while(lexer_input_in==lexer_input_out) {
-            fprintf(stderr, "waiting for consumer ...\n");
-            sleep(1);
+        pthread_mutex_lock(&lexer_input_mtx);
+        {
+            size_t j;
+            for (;;) {
+                j = (lexer_input_in+1) % 
+                    (sizeof(lexer_input)/sizeof(lexer_input[0]));
+                if (j!=lexer_input_out) {
+                    break;
+                }
+                pthread_cond_wait(&lexer_input_fillable, &lexer_input_mtx);
+            }
+            lexer_input[j] = buf[i];
+            lexer_input_in = j;
+            pthread_cond_signal(&lexer_input_available);
         }
+        pthread_mutex_unlock(&lexer_input_mtx);
     }
+    fprintf(stderr, "fill_buffer() ends\n");
 }
 
 void *reader_task(void *argv) {
@@ -47,16 +60,17 @@ void *reader_task(void *argv) {
         close(arg->input);
         return NULL;
       }
-      fprintf(stderr, "fd %d can be read\n", events[i].data.fd);
+      //fprintf(stderr, "fd %d can be read\n", events[i].data.fd);
       unsigned char buf[4096];
       ssize_t n = read(events[i].data.fd, buf, sizeof(buf));
-      fprintf(stderr, "read() returned %ld bytes\n", n);
+      //fprintf(stderr, "read() returned %ld bytes\n", n);
       if (n > 0) {
         fill_buffer(buf, n);
       }
     }
   }
 
+  fprintf(stderr, "reader: thread terminates ...\n");
   return NULL;
 }
 
