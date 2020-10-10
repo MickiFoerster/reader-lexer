@@ -12,9 +12,10 @@ typedef struct {
   void *(*handler)(void *);
 } pattern_t;
 
-pattern_t patterns[2] = {
+pattern_t patterns[] = {
     {.pattern = " login: ", .handler = NULL, .match_idx = 0},
-    {.pattern = "AAAA", .handler = NULL, .match_idx = 0}};
+    {.pattern = "AAAA", .handler = NULL, .match_idx = 0},
+    {.pattern = "AAAAASDF", .handler = NULL, .match_idx = 0}};
 const unsigned num_patterns = sizeof(patterns) / sizeof(patterns[0]);
 
 int search_pattern(unsigned char *buf, size_t n) {

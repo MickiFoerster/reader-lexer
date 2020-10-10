@@ -15,7 +15,7 @@ int pipe_to_reader[2];
 extern bool timeout_occurred;
 
 typedef struct {
-  unsigned char buf[8];
+  unsigned char buf[3];
   size_t in;
   size_t out;
   pthread_mutex_t mtx;
