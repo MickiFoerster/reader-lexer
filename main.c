@@ -47,7 +47,7 @@ int main() {
   }
 
   for (;;) {
-      fprintf(stderr, "lexer returned %d\n", lexer());
+    fprintf(stderr, "lexer returned %d\n", lexer());
   }
 
   rc = pthread_join(tid_reader, NULL);
