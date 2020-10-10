@@ -2,6 +2,7 @@
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/epoll.h>
 #include <unistd.h>
 
@@ -28,35 +29,66 @@ lexer_input_t lexer_input = {.in = 1,
                              .cond_input_available = PTHREAD_COND_INITIALIZER,
                              .condinput_fillable = PTHREAD_COND_INITIALIZER};
 
+int search_pattern(unsigned char *buf, size_t n);
+
 int lexer(void) {
-  pthread_mutex_lock(&lexer_input.mtx);
-  {
-    size_t j;
-    for (; !timeout_occurred;) {
-      j = (lexer_input.out + 1) %
-          (sizeof(lexer_input.buf) / sizeof(lexer_input.buf[0]));
-      if (j != lexer_input.in) {
-        break;
+  int pattern_matches = -1;
+  for (; pattern_matches == -1;) {
+    pthread_mutex_lock(&lexer_input.mtx);
+    {
+      size_t j;
+      for (; !timeout_occurred;) {
+        j = (lexer_input.out + 1) %
+            (sizeof(lexer_input.buf) / sizeof(lexer_input.buf[0]));
+        if (j != lexer_input.in) {
+          break;
+        }
+        pthread_cond_wait(&lexer_input.cond_input_available, &lexer_input.mtx);
       }
-      pthread_cond_wait(&lexer_input.cond_input_available, &lexer_input.mtx);
-    }
 
-    for (; !timeout_occurred;) {
-      size_t i = (lexer_input.out + 1) %
-                 (sizeof(lexer_input.buf) / sizeof(lexer_input.buf[0]));
-      if (i == lexer_input.in) {
-        fprintf(stderr, "\n");
-        break;
+      int search_space_start = -1;
+      int search_space_end = -1;
+      size_t len = 0;
+      for (; !timeout_occurred;) {
+        size_t i = (lexer_input.out + 1) %
+                   (sizeof(lexer_input.buf) / sizeof(lexer_input.buf[0]));
+        if (i == lexer_input.in) {
+          fprintf(stderr, "\n");
+          search_space_end = lexer_input.out;
+          break;
+        }
+        if (search_space_start == -1) {
+          search_space_start = i;
+        }
+        len++;
+        fprintf(stderr, "%c", lexer_input.buf[i]);
+        lexer_input.out = i;
       }
-      fprintf(stderr, "%c", lexer_input.buf[i]);
-      lexer_input.out = i;
-    }
-    pthread_cond_signal(&lexer_input.condinput_fillable);
-  }
-  pthread_mutex_unlock(&lexer_input.mtx);
 
-  if (timeout_occurred) {
-    return -1;
+      len *= sizeof(unsigned char);
+      fprintf(stderr, "allocate %ld bytes\n", len);
+      unsigned char *buf = (unsigned char *)malloc(len);
+      size_t l = 0;
+      assert(buf);
+      if (buf) {
+        for (size_t i = search_space_start;;) {
+          buf[l] = lexer_input.buf[i];
+          if (i == search_space_end)
+            break;
+          l++;
+          i = (i + 1) % (sizeof(lexer_input.buf) / sizeof(lexer_input.buf[0]));
+        }
+        pattern_matches = search_pattern(buf, len);
+        free(buf);
+      }
+
+      pthread_cond_signal(&lexer_input.condinput_fillable);
+    }
+    pthread_mutex_unlock(&lexer_input.mtx);
+
+    if (timeout_occurred) {
+      return -1;
+    }
   }
   return 0;
 }
@@ -75,7 +107,8 @@ static void fill_lexer_buffer(unsigned char *buf, size_t n) {
         }
         pthread_cond_wait(&lexer_input.condinput_fillable, &lexer_input.mtx);
       }
-      lexer_input.buf[j] = buf[i];
+
+      lexer_input.buf[lexer_input.in] = buf[i];
       lexer_input.in = j;
       pthread_cond_signal(&lexer_input.cond_input_available);
     }

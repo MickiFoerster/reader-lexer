@@ -16,8 +16,13 @@ pattern_t patterns[2] = {
     {.pattern = "AAAA", .handler = NULL, .match_idx = 0}};
 const unsigned num_patterns = sizeof(patterns) / sizeof(patterns[0]);
 
-int _lexer(void) {
-  return 0;
+int search_pattern(unsigned char *buf, size_t n) {
+  fprintf(stderr, "search pattern: '");
+  for (int i = 0; i < n; ++i) {
+    fprintf(stderr, "%c", buf[i]);
+  }
+  fprintf(stderr, "'\n");
+  return -1;
 #if 0
   /*
       * at least one match (first match counts)

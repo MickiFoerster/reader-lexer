@@ -9,7 +9,7 @@
 bool timeout_occurred = false;
 
 static void *timeout(void *argv) {
-  sleep(2);
+  sleep(60);
   fprintf(stderr, "Signal thread to terminate\n");
   ssize_t n = write(pipe_to_reader[PIPE_WRITE], "", 1);
   if (n < 0) {
