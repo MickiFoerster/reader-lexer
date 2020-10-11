@@ -11,26 +11,27 @@ typedef struct {
 } pattern_t;
 
 pattern_t patterns[] = {
-    {.pattern = " login: ", .handler = NULL, .match_idx = 0},
     {.pattern = "AAAA", .handler = NULL, .match_idx = 0},
-    {.pattern = "AAAAASDF", .handler = NULL, .match_idx = 0}};
+    {.pattern = "BBBB", .handler = NULL, .match_idx = 0}};
 const unsigned num_patterns = sizeof(patterns) / sizeof(patterns[0]);
 
 int search_pattern(unsigned char *buf, size_t n) {
   for (int j=0; j<n; ++j) {
       fprintf(stderr, "search pattern: '");
       for (int i = 0; i < n; ++i) {
-        fprintf(stderr, "%c", buf[i]);
+          switch(buf[i]) {
+              case '\n':
+                  fprintf(stderr, "\\n");
+                  break;
+              default:
+                  fprintf(stderr, "%c", buf[i]);
+                  break;
+          }
       }
       fprintf(stderr, "'\n");
 
-      bool at_least_one_pattern_could_fit = false;
       for (int i=0; i<num_patterns; ++i) {
           pattern_t *p = &patterns[i];
-          if (p->match_idx==-1) {
-              continue;
-          }
-          at_least_one_pattern_could_fit = true;
           if (p->pattern[p->match_idx] == buf[j]) {
               fprintf(stderr, "character %c fits, move forward\n", buf[j]);
               p->match_idx++;
@@ -41,17 +42,16 @@ int search_pattern(unsigned char *buf, size_t n) {
                       patterns[j].match_idx=0;
                   }
                   return i;
+              } else {
+                  size_t l=p->match_idx;
+                  while(p->pattern[l]!='\0') {
+                      l++;
+                  }
+                  fprintf(stderr, "still %ld characters must fit\n", l-p->match_idx);
               }
           } else {
               fprintf(stderr, "character %c does not fit, pattern %s is out\n", buf[j], p->pattern);
-              p->match_idx=-1;
-          }
-      }
-
-      if (at_least_one_pattern_could_fit == false) {
-          fprintf(stderr, "no pattern fits, so set index back to 0\n");
-          for (int j=0; j<num_patterns; ++j) {
-              patterns[j].match_idx=0;
+              p->match_idx=0;
           }
       }
   }

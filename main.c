@@ -11,10 +11,6 @@ int main() {
   for (;;) {
     int token = lexer();
     fprintf(stderr, "lexer returned %d\n", token);
-    if (token != -1) {
-      assert(token == 1);
-      break;
-    }
   }
 
   return 0;

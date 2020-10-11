@@ -124,7 +124,6 @@ int lexer(void) {
         size_t i = (lexer_input.out + 1) %
                    (sizeof(lexer_input.buf) / sizeof(lexer_input.buf[0]));
         if (i == lexer_input.in) {
-          fprintf(stderr, "\n");
           search_space_end = lexer_input.out;
           break;
         }
@@ -132,12 +131,10 @@ int lexer(void) {
           search_space_start = i;
         }
         len++;
-        fprintf(stderr, "%c", lexer_input.buf[i]);
         lexer_input.out = i;
       }
 
       len *= sizeof(unsigned char);
-      fprintf(stderr, "allocate %ld bytes\n", len);
       unsigned char *buf = (unsigned char *)malloc(len);
       size_t l = 0;
       assert(buf);
@@ -161,7 +158,6 @@ int lexer(void) {
 }
 
 static void fill_lexer_buffer(unsigned char *buf, size_t n) {
-  fprintf(stderr, "fill_lexer_buffer() starts\n");
   for (size_t i = 0; i < n; ++i) {
     pthread_mutex_lock(&lexer_input.mtx);
     {
@@ -181,7 +177,6 @@ static void fill_lexer_buffer(unsigned char *buf, size_t n) {
     }
     pthread_mutex_unlock(&lexer_input.mtx);
   }
-  fprintf(stderr, "fill_lexer_buffer() ends\n");
 }
 
 static void *reader_task(void *argv) {
@@ -198,8 +193,7 @@ static void *reader_task(void *argv) {
 
   for (;;) {
     struct epoll_event events[2];
-    int nfds = epoll_wait(epfd, events, 2, 10000);
-    fprintf(stderr, "reader returned from epoll_wait\n");
+    int nfds = epoll_wait(epfd, events, 2, -1);
     for (int i = 0; i < nfds; ++i) {
       if (events[i].data.fd == arg->turnoff) {
         close(arg->input);
@@ -208,10 +202,9 @@ static void *reader_task(void *argv) {
         free(argv);
         return NULL;
       }
-      fprintf(stderr, "fd %d can be read\n", events[i].data.fd);
       unsigned char buf[4096];
       ssize_t n = read(events[i].data.fd, buf, sizeof(buf));
-      fprintf(stderr, "read() returned %ld bytes\n", n);
+      //fprintf(stderr, "read() returned %ld bytes\n", n);
       if (n > 0) {
         fill_lexer_buffer(buf, n);
       }
