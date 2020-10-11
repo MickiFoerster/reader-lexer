@@ -51,12 +51,19 @@ static void start_reader(void) {
 
   reader_args_t args = {.turnoff = pipe_to_reader[PIPE_READ],
                         .input = STDIN_FILENO};
-  rc = pthread_create(tid_reader, NULL, reader_task, &args);
+  reader_args_t *p = (reader_args_t*) malloc(sizeof(reader_args_t));
+  if (p==NULL) {
+    perror("malloc() failed");
+    exit(EXIT_FAILURE);
+  }
+  *p = args;
+  rc = pthread_create(tid_reader, NULL, reader_task, p);
   if (rc != 0) {
     perror("pthread_create() for reader failed");
     free(tid_reader);
     exit(EXIT_FAILURE);
   }
+
   rc = pthread_detach(*tid_reader);
   if (rc != 0) {
     perror("pthread_detach() failed");
@@ -191,6 +198,7 @@ static void *reader_task(void *argv) {
 
   for (;;) {
     struct epoll_event events[2];
+    fprintf(stderr, "epoll wait ...\n");
     int nfds = epoll_wait(epfd, events, 2, 10000);
     fprintf(stderr, "reader returned from epoll_wait\n");
     for (int i = 0; i < nfds; ++i) {
