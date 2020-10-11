@@ -198,7 +198,6 @@ static void *reader_task(void *argv) {
 
   for (;;) {
     struct epoll_event events[2];
-    fprintf(stderr, "epoll wait ...\n");
     int nfds = epoll_wait(epfd, events, 2, 10000);
     fprintf(stderr, "reader returned from epoll_wait\n");
     for (int i = 0; i < nfds; ++i) {
@@ -206,6 +205,7 @@ static void *reader_task(void *argv) {
         close(arg->input);
         pthread_cond_signal(&lexer_input.cond_input_available);
         fprintf(stderr, "reader: thread terminates ...\n");
+        free(argv);
         return NULL;
       }
       fprintf(stderr, "fd %d can be read\n", events[i].data.fd);

@@ -12,7 +12,6 @@ int main() {
     int token = lexer();
     fprintf(stderr, "lexer returned %d\n", token);
     if (token != -1) {
-      fprintf(stderr, "TEST\n");
       assert(token == 1);
       break;
     }
