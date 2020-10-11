@@ -6,13 +6,19 @@
 #include <sys/epoll.h>
 #include <unistd.h>
 
+#define PIPE_READ 0
+#define PIPE_WRITE 1
+
 typedef struct {
   int turnoff;
   int input;
 } reader_args_t;
 
+int search_pattern(unsigned char *buf, size_t n);
 int pipe_to_reader[2];
-extern bool timeout_occurred;
+static pthread_t *tid_reader = NULL;
+static void end_reader(void);
+static void *reader_task(void *argv);
 
 typedef struct {
   unsigned char buf[3];
@@ -29,15 +35,73 @@ lexer_input_t lexer_input = {.in = 1,
                              .cond_input_available = PTHREAD_COND_INITIALIZER,
                              .condinput_fillable = PTHREAD_COND_INITIALIZER};
 
-int search_pattern(unsigned char *buf, size_t n);
+static void start_reader(void) {
+  assert(tid_reader == NULL);
+  tid_reader = malloc(sizeof(pthread_t));
+  if (tid_reader == NULL) {
+    perror("malloc() failed");
+    exit(EXIT_FAILURE);
+  }
+
+  int rc = pipe(pipe_to_reader);
+  if (rc != 0) {
+    perror("pipe() failed");
+    exit(EXIT_FAILURE);
+  }
+
+  reader_args_t args = {.turnoff = pipe_to_reader[PIPE_READ],
+                        .input = STDIN_FILENO};
+  rc = pthread_create(tid_reader, NULL, reader_task, &args);
+  if (rc != 0) {
+    perror("pthread_create() for reader failed");
+    free(tid_reader);
+    exit(EXIT_FAILURE);
+  }
+  rc = pthread_detach(*tid_reader);
+  if (rc != 0) {
+    perror("pthread_detach() failed");
+    free(tid_reader);
+    exit(EXIT_FAILURE);
+  }
+
+  atexit(end_reader);
+}
+
+static void end_reader(void) {
+  ssize_t n = write(pipe_to_reader[PIPE_WRITE], "", 1);
+  if (n < 0) {
+    perror("write() failed");
+    exit(EXIT_FAILURE);
+  }
+  fprintf(stderr, "Reader was signalled to terminate\n");
+  // fprintf(stderr, "Waiting for reader thread to join ... ");
+  // int rc = pthread_join(*tid_reader, NULL);
+  // if (rc != 0) {
+  //  perror("pthread_join() for reader failed");
+  //  exit(EXIT_FAILURE);
+  //}
+  // fprintf(stderr, "joined\n");
+
+  int rc = pthread_cancel(*tid_reader);
+  if (rc != 0) {
+    perror("pthread_join() for reader failed");
+    exit(EXIT_FAILURE);
+  }
+
+  free(tid_reader);
+}
 
 int lexer(void) {
+  if (tid_reader == NULL) {
+    start_reader();
+  }
+
   int pattern_matches = -1;
   for (; pattern_matches == -1;) {
     pthread_mutex_lock(&lexer_input.mtx);
     {
       size_t j;
-      for (; !timeout_occurred;) {
+      for (;;) {
         j = (lexer_input.out + 1) %
             (sizeof(lexer_input.buf) / sizeof(lexer_input.buf[0]));
         if (j != lexer_input.in) {
@@ -49,7 +113,7 @@ int lexer(void) {
       int search_space_start = -1;
       int search_space_end = -1;
       size_t len = 0;
-      for (; !timeout_occurred;) {
+      for (;;) {
         size_t i = (lexer_input.out + 1) %
                    (sizeof(lexer_input.buf) / sizeof(lexer_input.buf[0]));
         if (i == lexer_input.in) {
@@ -85,10 +149,6 @@ int lexer(void) {
       pthread_cond_signal(&lexer_input.condinput_fillable);
     }
     pthread_mutex_unlock(&lexer_input.mtx);
-
-    if (timeout_occurred) {
-      return -1;
-    }
   }
   return pattern_matches;
 }
@@ -117,7 +177,7 @@ static void fill_lexer_buffer(unsigned char *buf, size_t n) {
   fprintf(stderr, "fill_lexer_buffer() ends\n");
 }
 
-void *reader_task(void *argv) {
+static void *reader_task(void *argv) {
   reader_args_t *arg = (reader_args_t *)argv;
   int epfd = epoll_create(4);
 
@@ -132,6 +192,7 @@ void *reader_task(void *argv) {
   for (;;) {
     struct epoll_event events[2];
     int nfds = epoll_wait(epfd, events, 2, 10000);
+    fprintf(stderr, "reader returned from epoll_wait\n");
     for (int i = 0; i < nfds; ++i) {
       if (events[i].data.fd == arg->turnoff) {
         close(arg->input);
@@ -153,3 +214,4 @@ void *reader_task(void *argv) {
 
   return NULL;
 }
+

@@ -4,8 +4,6 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#include "reader.h"
-
 typedef struct {
   char pattern[32];
   int match_idx;
