@@ -33,7 +33,7 @@ int search_pattern(unsigned char *buf, size_t n) {
       for (int i=0; i<num_patterns; ++i) {
           pattern_t *p = &patterns[i];
           if (p->pattern[p->match_idx] == buf[j]) {
-              fprintf(stderr, "character %c fits, move forward\n", buf[j]);
+              fprintf(stderr, "character %c fits, move forward ...", buf[j]);
               p->match_idx++;
               if (p->pattern[p->match_idx] == '\0') {
                   fprintf(stderr, "MATCH!\n");
