@@ -15,8 +15,10 @@ typedef struct {
 } reader_args_t;
 
 int search_pattern(unsigned char *buf, size_t n);
-int pipe_to_reader[2];
+static int pipe_to_reader[2];
 static pthread_t *tid_reader = NULL;
+static bool lexer_finished = false;
+
 static void end_reader(void);
 static void *reader_task(void *argv);
 
@@ -69,8 +71,6 @@ static void start_reader(int fd) {
     free(tid_reader);
     exit(EXIT_FAILURE);
   }
-
-  atexit(end_reader);
 }
 
 static void end_reader(void) {
@@ -95,12 +95,17 @@ static void end_reader(void) {
   }
 
   free(tid_reader);
+  tid_reader = NULL;
+}
+
+void lexer_finish(void) {
+    lexer_finished = true;
+    end_reader();
 }
 
 void lexer_init(int fd) {
   if (tid_reader != NULL) {
-    fprintf(stderr, "error: lexer already initialized\n");
-    exit(EXIT_FAILURE);
+      lexer_finish();
   }
   start_reader(fd);
 }
@@ -119,10 +124,16 @@ int lexer(void) {
       for (;;) {
         j = (lexer_input.out + 1) %
             (sizeof(lexer_input.buf) / sizeof(lexer_input.buf[0]));
-        if (j != lexer_input.in) {
+        if (j != lexer_input.in || lexer_finished) {
           break;
         }
         pthread_cond_wait(&lexer_input.cond_input_available, &lexer_input.mtx);
+      }
+
+      if (lexer_finished) {
+          pattern_matches = -2;
+          pthread_mutex_unlock(&lexer_input.mtx);
+          continue;
       }
 
       int search_space_start = -1;
@@ -201,14 +212,21 @@ static void *reader_task(void *argv) {
 
   for (;;) {
     struct epoll_event events[2];
-    int nfds = epoll_wait(epfd, events, 2, -1);
+    int nfds = epoll_wait(epfd, events, 2, 5000);
+    switch (nfds) {
+        case -1:
+            perror("epoll_wait() failed");
+            exit(EXIT_FAILURE);
+            break;
+        case 0: // timeout
+            goto shutdown;
+            break;
+        default: 
+            break;
+    }
     for (int i = 0; i < nfds; ++i) {
       if (events[i].data.fd == arg->turnoff) {
-        close(arg->input);
-        pthread_cond_signal(&lexer_input.cond_input_available);
-        fprintf(stderr, "reader: thread terminates ...\n");
-        free(argv);
-        return NULL;
+          goto shutdown;
       }
       unsigned char buf[4096];
       ssize_t n = read(events[i].data.fd, buf, sizeof(buf));
@@ -220,7 +238,13 @@ static void *reader_task(void *argv) {
   }
 
   assert(0 && "This point will never be reached");
-
+  return NULL;
+shutdown:
+  lexer_finished = true;
+  close(arg->input);
+  pthread_cond_signal(&lexer_input.cond_input_available);
+  fprintf(stderr, "reader: thread terminates ...\n");
+  free(argv);
   return NULL;
 }
 
