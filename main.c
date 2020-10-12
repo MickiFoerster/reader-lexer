@@ -8,6 +8,10 @@
 
 #include "lexer.h"
 
+pattern_t patterns[] = {
+    {.pattern = "AAAA", .handler = NULL, .match_idx = 0},
+    {.pattern = " login: ", .handler = NULL, .match_idx = 0}};
+
 int main() {
   int pipe_to_lexer[2];
   int rc = pipe(pipe_to_lexer);
@@ -16,7 +20,7 @@ int main() {
     exit(EXIT_FAILURE);
   }
 
-  lexer_init(pipe_to_lexer[0]);
+  lexer_init(pipe_to_lexer[0], patterns, 2);
   const char *input_text[] = {"BBABBAABBBBBBAAABBBBBBAAAABBBBBBBBBB", "\n\nsuperhostname login: \n\n\n"};
   for (int i = 0; i < sizeof(input_text) / sizeof(input_text[0]); ++i) {
     fprintf(stderr, "give lexer the following input: %s\n", input_text[i]);

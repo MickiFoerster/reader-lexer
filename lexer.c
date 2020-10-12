@@ -6,6 +6,8 @@
 #include <sys/epoll.h>
 #include <unistd.h>
 
+#include "lexer.h"
+
 #define PIPE_READ 0
 #define PIPE_WRITE 1
 
@@ -14,11 +16,17 @@ typedef struct {
   int input;
 } reader_args_t;
 
-int search_pattern(unsigned char *buf, size_t n);
+int search_pattern(unsigned char *buf, 
+                   size_t n, 
+                   pattern_t *patterns, 
+                   size_t num_patterns);
 static int pipe_to_reader[2];
 static pthread_t *tid_reader = NULL;
 static bool lexer_finished = false;
+static pattern_t *patterns = NULL;
+static size_t num_patterns = 0;
 
+static void start_reader(int fd);
 static void end_reader(void);
 static void *reader_task(void *argv);
 
@@ -103,11 +111,13 @@ void lexer_finish(void) {
     end_reader();
 }
 
-void lexer_init(int fd) {
+void lexer_init(int fd, pattern_t *_patterns, size_t _num_patterns) {
   if (tid_reader != NULL) {
       lexer_finish();
   }
   start_reader(fd);
+  patterns = _patterns;
+  num_patterns = _num_patterns;
 }
 
 int lexer(void) {
@@ -165,7 +175,7 @@ int lexer(void) {
           l++;
           i = (i + 1) % (sizeof(lexer_input.buf) / sizeof(lexer_input.buf[0]));
         }
-        pattern_matches = search_pattern(buf, len);
+        pattern_matches = search_pattern(buf, len, patterns, num_patterns);
         free(buf);
       }
 
