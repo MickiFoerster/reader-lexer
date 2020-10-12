@@ -21,14 +21,15 @@ int main() {
   }
 
   lexer_init(pipe_to_lexer[0], patterns, 2);
-  const char *input_text[] = {"BBABBAABBBBBBAAABBBBBBAAAABBBBBBBBBB", "\n\nsuperhostname login: \n\n\n"};
+  const char *input_text[] = {"BBABBAABBBBBBAAABBBBBBAAAABBBBBBBBBB",
+                              "\n\nsuperhostname login: \n\n\n"};
   for (int i = 0; i < sizeof(input_text) / sizeof(input_text[0]); ++i) {
     fprintf(stderr, "give lexer the following input: %s\n", input_text[i]);
     write(pipe_to_lexer[1], input_text[i], strlen(input_text[i]));
     int token = lexer();
     fprintf(stderr, "lexer returned %d\n", token);
-    if (token==-2) {
-        break; // timeout
+    if (token == -1) {
+      break; // timeout
     }
   }
 

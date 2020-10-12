@@ -16,9 +16,7 @@ typedef struct {
   int input;
 } reader_args_t;
 
-int search_pattern(unsigned char *buf, 
-                   size_t n, 
-                   pattern_t *patterns, 
+int search_pattern(unsigned char *buf, size_t n, pattern_t *patterns,
                    size_t num_patterns);
 static int pipe_to_reader[2];
 static pthread_t *tid_reader = NULL;
@@ -60,8 +58,8 @@ static void start_reader(int fd) {
   }
 
   reader_args_t args = {.turnoff = pipe_to_reader[PIPE_READ], .input = fd};
-  reader_args_t *p = (reader_args_t*) malloc(sizeof(reader_args_t));
-  if (p==NULL) {
+  reader_args_t *p = (reader_args_t *)malloc(sizeof(reader_args_t));
+  if (p == NULL) {
     perror("malloc() failed");
     exit(EXIT_FAILURE);
   }
@@ -107,27 +105,28 @@ static void end_reader(void) {
 }
 
 void lexer_finish(void) {
-    lexer_finished = true;
-    end_reader();
+  lexer_finished = true;
+  end_reader();
 }
 
 void lexer_init(int fd, pattern_t *_patterns, size_t _num_patterns) {
   if (tid_reader != NULL) {
-      lexer_finish();
+    lexer_finish();
   }
   start_reader(fd);
   patterns = _patterns;
   num_patterns = _num_patterns;
 }
 
+// lexer() returns index of pattern or -1 when lexer is terminated
 int lexer(void) {
   if (tid_reader == NULL) {
     fprintf(stderr, "error: lexer must be initialized first\n");
     exit(EXIT_FAILURE);
   }
 
-  int pattern_matches = -1;
-  for (; pattern_matches == -1;) {
+  int pattern_matches = -2;
+  for (; pattern_matches == -2;) {
     pthread_mutex_lock(&lexer_input.mtx);
     {
       size_t j;
@@ -141,9 +140,9 @@ int lexer(void) {
       }
 
       if (lexer_finished) {
-          pattern_matches = -2;
-          pthread_mutex_unlock(&lexer_input.mtx);
-          continue;
+        pattern_matches = -1;
+        pthread_mutex_unlock(&lexer_input.mtx);
+        continue;
       }
 
       int search_space_start = -1;
@@ -224,23 +223,23 @@ static void *reader_task(void *argv) {
     struct epoll_event events[2];
     int nfds = epoll_wait(epfd, events, 2, 5000);
     switch (nfds) {
-        case -1:
-            perror("epoll_wait() failed");
-            exit(EXIT_FAILURE);
-            break;
-        case 0: // timeout
-            goto shutdown;
-            break;
-        default: 
-            break;
+    case -1:
+      perror("epoll_wait() failed");
+      exit(EXIT_FAILURE);
+      break;
+    case 0: // timeout
+      goto shutdown;
+      break;
+    default:
+      break;
     }
     for (int i = 0; i < nfds; ++i) {
       if (events[i].data.fd == arg->turnoff) {
-          goto shutdown;
+        goto shutdown;
       }
       unsigned char buf[4096];
       ssize_t n = read(events[i].data.fd, buf, sizeof(buf));
-      //fprintf(stderr, "read() returned %ld bytes\n", n);
+      // fprintf(stderr, "read() returned %ld bytes\n", n);
       if (n > 0) {
         fill_lexer_buffer(buf, n);
       }
