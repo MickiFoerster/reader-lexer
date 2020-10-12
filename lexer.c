@@ -35,7 +35,7 @@ lexer_input_t lexer_input = {.in = 1,
                              .cond_input_available = PTHREAD_COND_INITIALIZER,
                              .condinput_fillable = PTHREAD_COND_INITIALIZER};
 
-static void start_reader(void) {
+static void start_reader(int fd) {
   assert(tid_reader == NULL);
   tid_reader = malloc(sizeof(pthread_t));
   if (tid_reader == NULL) {
@@ -49,8 +49,7 @@ static void start_reader(void) {
     exit(EXIT_FAILURE);
   }
 
-  reader_args_t args = {.turnoff = pipe_to_reader[PIPE_READ],
-                        .input = STDIN_FILENO};
+  reader_args_t args = {.turnoff = pipe_to_reader[PIPE_READ], .input = fd};
   reader_args_t *p = (reader_args_t*) malloc(sizeof(reader_args_t));
   if (p==NULL) {
     perror("malloc() failed");
@@ -98,9 +97,18 @@ static void end_reader(void) {
   free(tid_reader);
 }
 
+void lexer_init(int fd) {
+  if (tid_reader != NULL) {
+    fprintf(stderr, "error: lexer already initialized\n");
+    exit(EXIT_FAILURE);
+  }
+  start_reader(fd);
+}
+
 int lexer(void) {
   if (tid_reader == NULL) {
-    start_reader();
+    fprintf(stderr, "error: lexer must be initialized first\n");
+    exit(EXIT_FAILURE);
   }
 
   int pattern_matches = -1;

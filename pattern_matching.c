@@ -5,14 +5,14 @@
 #include <stdio.h>
 
 typedef struct {
-  char pattern[32];
+  char pattern[256];
   int match_idx;
   void *(*handler)(void *);
 } pattern_t;
 
 pattern_t patterns[] = {
     {.pattern = "AAAA", .handler = NULL, .match_idx = 0},
-    {.pattern = "BBBB", .handler = NULL, .match_idx = 0}};
+    {.pattern = " login: ", .handler = NULL, .match_idx = 0}};
 const unsigned num_patterns = sizeof(patterns) / sizeof(patterns[0]);
 
 int search_pattern(unsigned char *buf, size_t n) {
