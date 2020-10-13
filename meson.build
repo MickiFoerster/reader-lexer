@@ -4,8 +4,8 @@ project(
 )
 
 executable(
-  'lexer',
-  sources: ['lexer.c', 'main.c', 'pattern_matching.c'],
+  'lexer-test',
+  sources: ['lexer.c', 'test.c', 'pattern_matching.c'],
   dependencies: [meson.get_compiler('c').find_library('pthread')],
   c_args: ['-std=c11', '-Wall', '-Werror']
 )

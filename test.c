@@ -20,9 +20,10 @@ int main() {
     exit(EXIT_FAILURE);
   }
 
-  lexer_init(pipe_to_lexer[0], patterns, 2);
-  const char *input_text[] = {"BBABBAABBBBBBAAABBBBBBAAAABBBBBBBBBB",
-                              "\n\nsuperhostname login: \n\n\n"};
+  lexer_init(pipe_to_lexer[0], patterns, 2, 1000);
+  const char *input_text[] = {
+      "BBABBAABBBBBBAAABBBBBBAAAABBBBBBBBBB\nhostname login: ",
+      "\n\nsuperhostname login: \n\n\n"};
   for (int i = 0; i < sizeof(input_text) / sizeof(input_text[0]); ++i) {
     fprintf(stderr, "give lexer the following input: %s\n", input_text[i]);
     write(pipe_to_lexer[1], input_text[i], strlen(input_text[i]));
@@ -32,7 +33,14 @@ int main() {
       break; // timeout
     }
   }
+  lexer_finish();
 
+  sleep(2);
+  // Test timeout
+  printf("Test lexer timeout:\n");
+  lexer_init(pipe_to_lexer[0], patterns, 2, 1000);
+  int token = lexer();
+  printf("lexer returned timeout: %s\n", (token == -1) ? "true" : "false");
   lexer_finish();
 
   return 0;

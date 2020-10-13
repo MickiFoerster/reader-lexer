@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdint.h>
 #include <unistd.h>
 
 typedef struct {
@@ -8,6 +9,7 @@ typedef struct {
   void *(*handler)(void *);
 } pattern_t;
 
-void lexer_init(int fd, pattern_t *patterns, size_t num_patterns);
+void lexer_init(int fd, pattern_t *patterns, size_t num_patterns,
+                uint32_t timeout);
 int lexer(void);
 void lexer_finish(void);
