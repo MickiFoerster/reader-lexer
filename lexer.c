@@ -88,7 +88,7 @@ static void end_reader(void) {
     perror("write() failed");
     exit(EXIT_FAILURE);
   }
-  fprintf(stderr, "Reader was signalled to terminate\n");
+  // fprintf(stderr, "Reader was signalled to terminate\n");
   while (!reader_finished) {
     // Make sure threads are not stuck in waiting condition
     pthread_cond_broadcast(&lexer_input.cond_input_available);
@@ -249,7 +249,7 @@ shutdown:
   lexer_finished = true;
   close(arg->input);
   pthread_cond_signal(&lexer_input.cond_input_available);
-  fprintf(stderr, "reader: thread terminates ...\n");
+  // fprintf(stderr, "reader: thread terminates ...\n");
   free(argv);
   reader_finished = true;
   return NULL;
