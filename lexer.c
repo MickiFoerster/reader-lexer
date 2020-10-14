@@ -34,7 +34,7 @@ static void end_reader(void);
 static void *reader_task(void *argv);
 
 typedef struct {
-  unsigned char buf[3];
+  unsigned char buf[4096];
   size_t in;
   size_t out;
   pthread_mutex_t mtx;
