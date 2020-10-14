@@ -20,7 +20,7 @@ int main() {
     exit(EXIT_FAILURE);
   }
 
-  lexer_init(pipe_to_lexer[0], patterns, 2, 1000);
+  lexer_init(pipe_to_lexer[0], patterns, 2, 500);
   const char *input_text[] = {
       "BBABBAABBBBBBAAABBBBBBAAAABBBBBBBBBB\nhostname login: ",
       "\n\nsuperhostname login: \n\n\n"};

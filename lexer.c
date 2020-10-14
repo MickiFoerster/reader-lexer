@@ -25,6 +25,7 @@ static pthread_t *tid_reader = NULL;
 static bool lexer_terminate = false;
 static bool reader_finished = false;
 static uint32_t reader_timeout = -1; // -1 == no timeout in reader
+static uint32_t lexer_timeout_ms = 100;
 static pattern_t *patterns = NULL;
 static size_t num_patterns = 0;
 
@@ -107,13 +108,14 @@ void lexer_finish(void) {
 }
 
 void lexer_init(int fd, pattern_t *_patterns, size_t _num_patterns,
-                uint32_t timeout) {
+                uint32_t timeout_ms) {
   if (tid_reader != NULL) {
     lexer_finish();
   }
   start_reader(fd);
   patterns = _patterns;
   num_patterns = _num_patterns;
+  lexer_timeout_ms = timeout_ms;
 }
 
 // lexer() returns index of pattern or -1 when lexer is terminated
@@ -143,7 +145,8 @@ int lexer(void) {
             perror("clock_gettime() failed");
             exit(EXIT_FAILURE);
           }
-          timeout.tv_sec += 1;
+          timeout.tv_sec += lexer_timeout_ms / 1000;
+          timeout.tv_nsec += lexer_timeout_ms % 1000;
           err = pthread_cond_timedwait(&lexer_input.cond_input_available,
                                        &lexer_input.mtx, &timeout);
           if (err) {
