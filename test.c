@@ -25,12 +25,32 @@ int main() {
       "BBABBAABBBBBBAAABBBBBBAAAABBBBBBBBBB\nhostname login: ",
       "\n\nsuperhostname login: \n\n\n"};
   for (int i = 0; i < sizeof(input_text) / sizeof(input_text[0]); ++i) {
-    fprintf(stderr, "give lexer the following input: %s\n", input_text[i]);
-    write(pipe_to_lexer[1], input_text[i], strlen(input_text[i]));
-    int token = lexer();
-    fprintf(stderr, "lexer returned %d\n", token);
-    if (token == -1) {
-      break; // timeout
+    fprintf(stderr, "give lexer the following input (%d): %s\n", i,
+            input_text[i]);
+    ssize_t n = write(pipe_to_lexer[1], input_text[i], strlen(input_text[i]));
+    assert(n == strlen(input_text[i]));
+
+    switch (i) {
+    case 0: {
+      int expected_token_sequence[] = {0, 1, -1, -1, -1};
+      for (int j = 0; j < sizeof(expected_token_sequence) /
+                              sizeof(expected_token_sequence[0]);
+           ++j) {
+        int token = lexer();
+        assert(token == expected_token_sequence[j]);
+        fprintf(stderr, "lexer returned token %d as expected\n", token);
+      }
+    } break;
+    case 1: {
+      int expected_token_sequence[3] = {1, -1};
+      for (int j = 0; j < 2; ++j) {
+        int token = lexer();
+        assert(token == expected_token_sequence[j]);
+        fprintf(stderr, "lexer returned token %d as expected\n", token);
+      }
+    } break;
+    default:
+      assert(0);
     }
   }
   lexer_finish();

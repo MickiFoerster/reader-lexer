@@ -20,7 +20,7 @@ int search_pattern(unsigned char *buf, size_t n, pattern_t *patterns,
                    size_t num_patterns);
 static int pipe_to_reader[2];
 static pthread_t *tid_reader = NULL;
-static bool lexer_finished = false;
+static bool lexer_terminate = false;
 static bool reader_finished = false;
 static uint32_t reader_timeout = -1;
 static pattern_t *patterns = NULL;
@@ -47,7 +47,7 @@ lexer_input_t lexer_input = {.in = 1,
 
 static void start_reader(int fd) {
   assert(tid_reader == NULL);
-  lexer_finished = false;
+  lexer_terminate = false;
   tid_reader = malloc(sizeof(pthread_t));
   if (tid_reader == NULL) {
     perror("malloc() failed");
@@ -100,7 +100,7 @@ static void end_reader(void) {
 }
 
 void lexer_finish(void) {
-  lexer_finished = true;
+  lexer_terminate = true;
   end_reader();
 }
 
@@ -130,13 +130,13 @@ int lexer(void) {
       for (;;) {
         j = (lexer_input.out + 1) %
             (sizeof(lexer_input.buf) / sizeof(lexer_input.buf[0]));
-        if (j != lexer_input.in || lexer_finished) {
+        if (j != lexer_input.in || lexer_terminate) {
           break;
         }
         pthread_cond_wait(&lexer_input.cond_input_available, &lexer_input.mtx);
       }
 
-      if (lexer_finished) {
+      if (lexer_terminate) {
         pattern_matches = -1;
         pthread_mutex_unlock(&lexer_input.mtx);
         continue;
@@ -179,6 +179,7 @@ int lexer(void) {
     }
     pthread_mutex_unlock(&lexer_input.mtx);
   }
+
   return pattern_matches;
 }
 
@@ -190,10 +191,15 @@ static void fill_lexer_buffer(unsigned char *buf, size_t n) {
       for (;;) {
         j = (lexer_input.in + 1) %
             (sizeof(lexer_input.buf) / sizeof(lexer_input.buf[0]));
-        if (j != lexer_input.out || lexer_finished) {
+        if (j != lexer_input.out || lexer_terminate) {
           break;
         }
         pthread_cond_wait(&lexer_input.condinput_fillable, &lexer_input.mtx);
+      }
+
+      if (lexer_terminate) {
+        pthread_mutex_unlock(&lexer_input.mtx);
+        break;
       }
 
       lexer_input.buf[lexer_input.in] = buf[i];
@@ -246,10 +252,9 @@ static void *reader_task(void *argv) {
   assert(0 && "This point will never be reached");
 
 shutdown:
-  lexer_finished = true;
+  fprintf(stderr, "reader: thread terminates ...\n");
   close(arg->input);
   pthread_cond_signal(&lexer_input.cond_input_available);
-  // fprintf(stderr, "reader: thread terminates ...\n");
   free(argv);
   reader_finished = true;
   return NULL;
