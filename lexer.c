@@ -273,6 +273,9 @@ static void *reader_task(void *argv) {
       ssize_t n = read(events[i].data.fd, buf, sizeof(buf));
       // fprintf(stderr, "read() returned %ld bytes\n", n);
       if (n > 0) {
+        buf[n] = '\0';
+        printf("%s", buf);
+        fflush(stdout);
         fill_lexer_buffer(buf, n);
       }
     }
