@@ -42,8 +42,10 @@ int main() {
       }
     } break;
     case 1: {
-      int expected_token_sequence[3] = {1, -1};
-      for (int j = 0; j < 2; ++j) {
+      int expected_token_sequence[] = {1, -1, -1, -1};
+      for (int j = 0; j < sizeof(expected_token_sequence) /
+                              sizeof(expected_token_sequence[0]);
+           ++j) {
         int token = lexer();
         assert(token == expected_token_sequence[j]);
         fprintf(stderr, "lexer returned token %d as expected\n", token);
@@ -53,14 +55,6 @@ int main() {
       assert(0);
     }
   }
-  lexer_finish();
-
-  sleep(2);
-  // Test timeout
-  printf("Test lexer timeout:\n");
-  lexer_init(pipe_to_lexer[0], patterns, 2, 1000);
-  int token = lexer();
-  printf("lexer returned timeout: %s\n", (token == -1) ? "true" : "false");
   lexer_finish();
 
   return 0;

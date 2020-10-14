@@ -1,9 +1,11 @@
 #include <assert.h>
+#include <errno.h>
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/epoll.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "lexer.h"
@@ -22,7 +24,7 @@ static int pipe_to_reader[2];
 static pthread_t *tid_reader = NULL;
 static bool lexer_terminate = false;
 static bool reader_finished = false;
-static uint32_t reader_timeout = -1;
+static uint32_t reader_timeout = -1; // -1 == no timeout in reader
 static pattern_t *patterns = NULL;
 static size_t num_patterns = 0;
 
@@ -112,7 +114,6 @@ void lexer_init(int fd, pattern_t *_patterns, size_t _num_patterns,
   start_reader(fd);
   patterns = _patterns;
   num_patterns = _num_patterns;
-  reader_timeout = timeout;
 }
 
 // lexer() returns index of pattern or -1 when lexer is terminated
@@ -133,7 +134,33 @@ int lexer(void) {
         if (j != lexer_input.in || lexer_terminate) {
           break;
         }
-        pthread_cond_wait(&lexer_input.cond_input_available, &lexer_input.mtx);
+
+        // Wait till input is available or timeout expired
+        for (;;) {
+          struct timespec timeout = {0, 0};
+          int err = clock_gettime(CLOCK_REALTIME, &timeout);
+          if (err) {
+            perror("clock_gettime() failed");
+            exit(EXIT_FAILURE);
+          }
+          timeout.tv_sec += 1;
+          err = pthread_cond_timedwait(&lexer_input.cond_input_available,
+                                       &lexer_input.mtx, &timeout);
+          if (err) {
+            pthread_mutex_unlock(&lexer_input.mtx);
+            switch (err) {
+            case ETIMEDOUT:
+              return -1;
+            case EINTR:
+              continue;
+            default:
+              perror("pthread_cond_timedwait() failed");
+              exit(EXIT_FAILURE);
+            }
+          }
+          break; // no timeout or error means condition is fullfilled
+        }
+        //pthread_cond_wait(&lexer_input.cond_input_available, &lexer_input.mtx);
       }
 
       if (lexer_terminate) {
@@ -229,11 +256,9 @@ static void *reader_task(void *argv) {
     switch (nfds) {
     case -1:
       perror("epoll_wait() failed");
-      exit(EXIT_FAILURE);
-      break;
+      goto error;
     case 0: // timeout
-      goto shutdown;
-      break;
+      continue;
     default:
       break;
     }
@@ -251,8 +276,14 @@ static void *reader_task(void *argv) {
   }
   assert(0 && "This point will never be reached");
 
+error:
+  close(arg->input);
+  pthread_cond_signal(&lexer_input.cond_input_available);
+  free(argv);
+  reader_finished = true;
+  exit(EXIT_FAILURE);
 shutdown:
-  fprintf(stderr, "reader: thread terminates ...\n");
+  // fprintf(stderr, "reader: thread terminates ...\n");
   close(arg->input);
   pthread_cond_signal(&lexer_input.cond_input_available);
   free(argv);
