@@ -1,7 +1,14 @@
 #pragma once
 
+#include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
+
+typedef struct {
+  pthread_mutex_t mtx;
+  pthread_cond_t cond_input_available;
+  pthread_cond_t condinput_fillable;
+} lexer_sync_t;
 
 // lexer_init() takes file descriptor from which input is read and a timeout
 // in milliseconds how long read call is allowed to be idle.

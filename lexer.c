@@ -9,16 +9,16 @@
 #include <unistd.h>
 
 #include "lexer.h"
+#include "reader.h"
 
 typedef struct {
   unsigned char buf[4096];
   size_t in;
   size_t out;
-  pthread_mutex_t mtx;
-  pthread_cond_t cond_input_available;
-  pthread_cond_t condinput_fillable;
   bool terminate;
   uint32_t timeout_ms;
+  lexer_sync_t sync;
+  reader_t *reader;
 } lexer_input_t;
 
 void lexer_finish(void *token) {
@@ -28,18 +28,29 @@ void lexer_finish(void *token) {
 
 void *lexer_init(int fd, uint32_t timeout_ms) {
   lexer_input_t *new_lexer = (lexer_input_t *)malloc(sizeof(lexer_input_t));
+  if (!new_lexer) {
+    return NULL;
+  }
+  const lexer_sync_t sync = {.mtx = PTHREAD_MUTEX_INITIALIZER,
+                             .cond_input_available = PTHREAD_COND_INITIALIZER,
+                             .condinput_fillable = PTHREAD_COND_INITIALIZER};
   lexer_input_t lexer_input = {.in = 1,
                                .out = 0,
-                               .mtx = PTHREAD_MUTEX_INITIALIZER,
-                               .cond_input_available = PTHREAD_COND_INITIALIZER,
                                .terminate = false,
                                .timeout_ms = timeout_ms,
-                               .condinput_fillable = PTHREAD_COND_INITIALIZER};
+                               .sync = sync};
   *new_lexer = lexer_input;
+  reader_t *reader = start_reader(fd, &new_lexer->sync);
+  if (!reader) {
+    free(new_lexer);
+    return NULL;
+  }
+  new_lexer->reader = reader;
 
-  start_reader(fd);
   patterns = _patterns;
   num_patterns = _num_patterns;
+
+  return new_lexer;
 }
 
 bool lexer_addpattern(char *pattern) { return true; }
@@ -89,7 +100,6 @@ int lexer(void *token) {
           }
           break; // no timeout or error means condition is fullfilled
         }
-        //pthread_cond_wait(&lexer_input.cond_input_available, &lexer_input.mtx);
       }
 
       if (lexer_terminate) {
