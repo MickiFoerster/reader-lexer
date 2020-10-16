@@ -15,8 +15,7 @@ static pattern_t *patterns = NULL;
 static size_t num_patterns = 0;
 
 // search_pattern returns index 0-n of pattern or -2 when no pattern matches
-int search_pattern(unsigned char *buf, size_t n, pattern_t *patterns,
-                   size_t num_patterns) {
+int search_pattern(unsigned char *buf, size_t n) {
   /*
   fprintf(stderr, "search pattern (%ld): '", n);
   for (int i = 0; i < n; ++i) {

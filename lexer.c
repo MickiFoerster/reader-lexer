@@ -12,19 +12,11 @@
 #include "reader.h"
 
 typedef struct {
-  unsigned char buf[4096];
-  size_t in;
-  size_t out;
   bool terminate;
   uint32_t timeout_ms;
   lexer_sync_t sync;
   reader_t *reader;
 } lexer_input_t;
-
-void lexer_finish(void *token) {
-  lexer_terminate = true;
-  end_reader();
-}
 
 void *lexer_init(int fd, uint32_t timeout_ms) {
   lexer_input_t *new_lexer = (lexer_input_t *)malloc(sizeof(lexer_input_t));
@@ -34,11 +26,8 @@ void *lexer_init(int fd, uint32_t timeout_ms) {
   const lexer_sync_t sync = {.mtx = PTHREAD_MUTEX_INITIALIZER,
                              .cond_input_available = PTHREAD_COND_INITIALIZER,
                              .condinput_fillable = PTHREAD_COND_INITIALIZER};
-  lexer_input_t lexer_input = {.in = 1,
-                               .out = 0,
-                               .terminate = false,
-                               .timeout_ms = timeout_ms,
-                               .sync = sync};
+  lexer_input_t lexer_input = {
+      .terminate = false, .timeout_ms = timeout_ms, .sync = sync};
   *new_lexer = lexer_input;
   reader_t *reader = start_reader(fd, &new_lexer->sync);
   if (!reader) {
@@ -47,30 +36,30 @@ void *lexer_init(int fd, uint32_t timeout_ms) {
   }
   new_lexer->reader = reader;
 
-  patterns = _patterns;
-  num_patterns = _num_patterns;
-
   return new_lexer;
+}
+
+void lexer_finish(void *token) {
+  lexer_input_t *this = (lexer_input_t *)token;
+  this->terminate = true;
+  end_reader(this->reader);
 }
 
 bool lexer_addpattern(char *pattern) { return true; }
 
 // lexer() returns index of pattern or -1 when timeout expired
 int lexer(void *token) {
-  if (tid_reader == NULL) {
-    fprintf(stderr, "error: lexer must be initialized first\n");
-    exit(EXIT_FAILURE);
-  }
+  lexer_input_t *this = (lexer_input_t *)token;
 
   int pattern_matches = -2;
   for (; pattern_matches == -2;) {
-    pthread_mutex_lock(&lexer_input.mtx);
+    pthread_mutex_lock(&this->sync.mtx);
     {
       size_t j;
       for (;;) {
-        j = (lexer_input.out + 1) %
-            (sizeof(lexer_input.buf) / sizeof(lexer_input.buf[0]));
-        if (j != lexer_input.in || lexer_terminate) {
+        j = (this->reader->out + 1) %
+            (sizeof(this->reader->buf) / sizeof(this->reader->buf[0]));
+        if (j != this->reader->in || this->terminate) {
           break;
         }
 
@@ -82,12 +71,12 @@ int lexer(void *token) {
             perror("clock_gettime() failed");
             exit(EXIT_FAILURE);
           }
-          timeout.tv_sec += lexer_timeout_ms / 1000;
-          timeout.tv_nsec += lexer_timeout_ms % 1000;
-          err = pthread_cond_timedwait(&lexer_input.cond_input_available,
-                                       &lexer_input.mtx, &timeout);
+          timeout.tv_sec += this->timeout_ms / 1000;
+          timeout.tv_nsec += this->timeout_ms % 1000;
+          err = pthread_cond_timedwait(&this->sync.cond_input_available,
+                                       &this->sync.mtx, &timeout);
           if (err) {
-            pthread_mutex_unlock(&lexer_input.mtx);
+            pthread_mutex_unlock(&this->sync.mtx);
             switch (err) {
             case ETIMEDOUT:
               return -1;
@@ -102,9 +91,9 @@ int lexer(void *token) {
         }
       }
 
-      if (lexer_terminate) {
+      if (this->terminate) {
         pattern_matches = -1;
-        pthread_mutex_unlock(&lexer_input.mtx);
+        pthread_mutex_unlock(&this->sync.mtx);
         continue;
       }
 
@@ -112,17 +101,17 @@ int lexer(void *token) {
       int search_space_end = -1;
       size_t len = 0;
       for (;;) {
-        size_t i = (lexer_input.out + 1) %
-                   (sizeof(lexer_input.buf) / sizeof(lexer_input.buf[0]));
-        if (i == lexer_input.in) {
-          search_space_end = lexer_input.out;
+        size_t i = (this->reader->out + 1) %
+                   (sizeof(this->reader->buf) / sizeof(this->reader->buf[0]));
+        if (i == this->reader->in) {
+          search_space_end = this->reader->out;
           break;
         }
         if (search_space_start == -1) {
           search_space_start = i;
         }
         len++;
-        lexer_input.out = i;
+        this->reader->out = i;
       }
 
       len *= sizeof(unsigned char);
@@ -131,19 +120,20 @@ int lexer(void *token) {
       assert(buf);
       if (buf) {
         for (size_t i = search_space_start;;) {
-          buf[l] = lexer_input.buf[i];
+          buf[l] = this->reader->buf[i];
           if (i == search_space_end)
             break;
           l++;
-          i = (i + 1) % (sizeof(lexer_input.buf) / sizeof(lexer_input.buf[0]));
+          i = (i + 1) %
+              (sizeof(this->reader->buf) / sizeof(this->reader->buf[0]));
         }
-        pattern_matches = search_pattern(buf, len, patterns, num_patterns);
+        pattern_matches = search_pattern(buf, len);
         free(buf);
       }
 
-      pthread_cond_signal(&lexer_input.condinput_fillable);
+      pthread_cond_signal(&this->sync.condinput_fillable);
     }
-    pthread_mutex_unlock(&lexer_input.mtx);
+    pthread_mutex_unlock(&this->sync.mtx);
   }
 
   return pattern_matches;
