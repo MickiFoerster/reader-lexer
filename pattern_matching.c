@@ -6,6 +6,14 @@
 
 #include "lexer.h"
 
+typedef struct {
+  char *pattern;
+  int match_idx;
+} pattern_t;
+
+static pattern_t *patterns = NULL;
+static size_t num_patterns = 0;
+
 // search_pattern returns index 0-n of pattern or -2 when no pattern matches
 int search_pattern(unsigned char *buf, size_t n, pattern_t *patterns,
                    size_t num_patterns) {
