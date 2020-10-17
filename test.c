@@ -11,7 +11,7 @@
 
 int main() {
   patterns_push_back("AAAA", 0);
-  patterns_push_back(" login: ", 0);
+  patterns_push_back(" login: ", 1);
 
   int pipe_to_lexer[2];
   int rc = pipe(pipe_to_lexer);
@@ -20,7 +20,7 @@ int main() {
     exit(EXIT_FAILURE);
   }
 
-  void *lexer_instance = lexer_init(pipe_to_lexer[0], 500);
+  void *lexer_instance = lexer_init(pipe_to_lexer[0], 1000);
   assert(lexer_instance);
 
   const char *input_text[] = {
@@ -39,6 +39,7 @@ int main() {
                               sizeof(expected_token_sequence[0]);
            ++j) {
         int token = lexer(lexer_instance);
+        fprintf(stderr, "lexer returned token %d \n", token);
         assert(token == expected_token_sequence[j]);
         fprintf(stderr, "lexer returned token %d as expected\n", token);
       }

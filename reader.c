@@ -123,7 +123,7 @@ static void *reader_task(void *argv) {
       if (events[i].data.fd == reader->args.turnoff) {
         goto shutdown;
       }
-      unsigned char buf[4096];
+      unsigned char buf[3];
       ssize_t n = read(events[i].data.fd, buf, sizeof(buf));
       // fprintf(stderr, "read() returned %ld bytes\n", n);
       if (n > 0) {

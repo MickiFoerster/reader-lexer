@@ -102,7 +102,6 @@ int search_pattern(unsigned char *buf, size_t n) {
 
   for (int j = 0; j < n; ++j) {
     for (listOfPatterns_t *elem = first(); elem != NULL; elem = elem->next) {
-      printf("pattern: %s\n", elem->pattern->pattern);
       pattern_t *p = elem->pattern;
       if (p->pattern[p->match_idx] == buf[j]) {
         // fprintf(stderr, "character %c fits in pattern '%s', move forward

@@ -44,7 +44,6 @@ void lexer_finish(void *token) {
   lexer_input_t *this = (lexer_input_t *)token;
   this->terminate = true;
   end_reader(this->reader);
-  free(this);
 }
 
 // lexer() returns index of pattern or -1 when timeout expired
