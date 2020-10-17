@@ -11,6 +11,11 @@ typedef struct {
   int match_idx;
 } pattern_t;
 
+typedef struct tagListOfPatterns {
+  pattern_t *pattern;
+  struct tagListOfPatterns *next;
+} listOfPatterns_t;
+
 static pattern_t *patterns = NULL;
 static size_t num_patterns = 0;
 
