@@ -7,12 +7,12 @@
 #include <unistd.h>
 
 #include "lexer.h"
-
-pattern_t patterns[] = {
-    {.pattern = "AAAA", .handler = NULL, .match_idx = 0},
-    {.pattern = " login: ", .handler = NULL, .match_idx = 0}};
+#include "pattern_matching.h"
 
 int main() {
+  patterns_push_back("AAAA", 0);
+  patterns_push_back(" login: ", 0);
+
   int pipe_to_lexer[2];
   int rc = pipe(pipe_to_lexer);
   if (rc != 0) {
@@ -20,7 +20,9 @@ int main() {
     exit(EXIT_FAILURE);
   }
 
-  lexer_init(pipe_to_lexer[0], patterns, 2, 500);
+  void *lexer_instance = lexer_init(pipe_to_lexer[0], 500);
+  assert(lexer_instance);
+
   const char *input_text[] = {
       "BBABBAABBBBBBAAABBBBBBAAAABBBBBBBBBB\nhostname login: ",
       "\n\nsuperhostname login: \n\n\n"};
@@ -36,7 +38,7 @@ int main() {
       for (int j = 0; j < sizeof(expected_token_sequence) /
                               sizeof(expected_token_sequence[0]);
            ++j) {
-        int token = lexer();
+        int token = lexer(lexer_instance);
         assert(token == expected_token_sequence[j]);
         fprintf(stderr, "lexer returned token %d as expected\n", token);
       }
@@ -46,7 +48,7 @@ int main() {
       for (int j = 0; j < sizeof(expected_token_sequence) /
                               sizeof(expected_token_sequence[0]);
            ++j) {
-        int token = lexer();
+        int token = lexer(lexer_instance);
         assert(token == expected_token_sequence[j]);
         fprintf(stderr, "lexer returned token %d as expected\n", token);
       }
@@ -55,7 +57,7 @@ int main() {
       assert(0);
     }
   }
-  lexer_finish();
+  lexer_finish(lexer_instance);
 
   return 0;
 }
