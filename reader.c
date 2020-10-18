@@ -21,21 +21,21 @@ void *start_reader(int fd, lexer_sync_t *sync) {
     return NULL;
   }
 
+  memset(reader, 0, sizeof(reader_t));
   int rc = pipe(reader->pipe_to_reader);
   if (rc != 0) {
     perror("pipe() failed");
     exit(EXIT_FAILURE);
   }
-
-  memset(reader->buf, 0, sizeof(reader->buf));
   reader->in = 1;
   reader->out = 0;
   reader->reader_timeout = 100;
+  reader->terminate = false;
   reader->reader_finished = false;
   reader->sync = sync;
   const reader_args_t args = {.turnoff = reader->pipe_to_reader[PIPE_READ],
                               .input = fd};
-  reader->args = args;
+  memcpy(&reader->args, &args, sizeof(reader_args_t));
   rc = pthread_create(&reader->tid_reader, NULL, reader_task, reader);
   if (rc != 0) {
     perror("pthread_create() for reader failed");
@@ -58,11 +58,8 @@ void end_reader(void *token) {
     perror("write() failed");
     exit(EXIT_FAILURE);
   }
-  // fprintf(stderr, "Reader was signalled to terminate\n");
   while (!reader->reader_finished) {
-    // Make sure threads are not stuck in waiting condition
-    pthread_cond_broadcast(&reader->sync->cond_input_available);
-    pthread_cond_broadcast(&reader->sync->condinput_fillable);
+    usleep(100000);
   }
 
   free(reader);
@@ -100,6 +97,7 @@ static void *reader_task(void *argv) {
   int epfd = epoll_create(4);
 
   struct epoll_event event;
+  memset(&event, 0, sizeof(event));
   event.data.fd = reader->args.input;
   event.events = EPOLLIN;
   epoll_ctl(epfd, EPOLL_CTL_ADD, reader->args.input, &event);
@@ -113,7 +111,10 @@ static void *reader_task(void *argv) {
     switch (nfds) {
     case -1:
       perror("epoll_wait() failed");
-      goto error;
+      close(reader->args.input);
+      pthread_cond_signal(&reader->sync->cond_input_available);
+      reader->reader_finished = true;
+      exit(EXIT_FAILURE);
     case 0: // timeout
       continue;
     default:
@@ -121,7 +122,11 @@ static void *reader_task(void *argv) {
     }
     for (int i = 0; i < nfds; ++i) {
       if (events[i].data.fd == reader->args.turnoff) {
-        goto shutdown;
+        close(reader->args.input);
+        pthread_cond_signal(&reader->sync->cond_input_available);
+        fprintf(stderr, "exit from reader thread\n");
+        reader->reader_finished = true;
+        return NULL;
       }
       unsigned char buf[3];
       ssize_t n = read(events[i].data.fd, buf, sizeof(buf));
@@ -135,18 +140,4 @@ static void *reader_task(void *argv) {
     }
   }
   assert(0 && "This point will never be reached");
-
-error:
-  close(reader->args.input);
-  pthread_cond_signal(&reader->sync->cond_input_available);
-  free(argv);
-  reader->reader_finished = true;
-  exit(EXIT_FAILURE);
-shutdown:
-  // fprintf(stderr, "reader: thread terminates ...\n");
-  close(reader->args.input);
-  pthread_cond_signal(&reader->sync->cond_input_available);
-  free(argv);
-  reader->reader_finished = true;
-  return NULL;
 }
