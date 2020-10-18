@@ -10,8 +10,8 @@
 #include "pattern_matching.h"
 
 int main() {
-  patterns_push_back("AAAA", 0);
-  patterns_push_back(" login: ", 1);
+  patterns_push_back("AAAA", 23);
+  patterns_push_back(" login: ", 42);
 
   int pipe_to_lexer[2];
   int rc = pipe(pipe_to_lexer);
@@ -20,7 +20,7 @@ int main() {
     exit(EXIT_FAILURE);
   }
 
-  void *lexer_instance = lexer_init(pipe_to_lexer[0], 1000);
+  void *lexer_instance = lexer_init(pipe_to_lexer[0], 100);
   assert(lexer_instance);
 
   const char *input_text[] = {
@@ -34,23 +34,38 @@ int main() {
 
     switch (i) {
     case 0: {
-      int expected_token_sequence[] = {0, 1, -1, -1, -1};
+      int expected_token_sequence[] = {23, 42};
       for (int j = 0; j < sizeof(expected_token_sequence) /
                               sizeof(expected_token_sequence[0]);
            ++j) {
-        int token = lexer(lexer_instance);
-        fprintf(stderr, "lexer returned token %d \n", token);
-        assert(token == expected_token_sequence[j]);
+        int token;
+        for (;;) {
+          token = lexer(lexer_instance);
+          fprintf(stderr, "lexer returned token %d \n", token);
+          if (token == -1) {
+            usleep(1000000);
+            continue;
+          }
+          break;
+        }
         fprintf(stderr, "lexer returned token %d as expected\n", token);
       }
     } break;
     case 1: {
-      int expected_token_sequence[] = {1, -1, -1, -1};
+      int expected_token_sequence[] = {42};
       for (int j = 0; j < sizeof(expected_token_sequence) /
                               sizeof(expected_token_sequence[0]);
            ++j) {
-        int token = lexer(lexer_instance);
-        assert(token == expected_token_sequence[j]);
+        int token;
+        for (;;) {
+          token = lexer(lexer_instance);
+          fprintf(stderr, "lexer returned token %d \n", token);
+          if (token == -1) {
+            usleep(1000000);
+            continue;
+          }
+          break;
+        }
         fprintf(stderr, "lexer returned token %d as expected\n", token);
       }
     } break;

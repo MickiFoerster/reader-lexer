@@ -13,6 +13,8 @@
 #define PIPE_READ 0
 #define PIPE_WRITE 1
 
+#define READER_BUFFER_SIZE 4096
+
 static void *reader_task(void *argv);
 
 void *start_reader(int fd, lexer_sync_t *sync) {
@@ -128,7 +130,7 @@ static void *reader_task(void *argv) {
         reader->reader_finished = true;
         return NULL;
       }
-      unsigned char buf[3];
+      unsigned char buf[READER_BUFFER_SIZE];
       ssize_t n = read(events[i].data.fd, buf, sizeof(buf));
       // fprintf(stderr, "read() returned %ld bytes\n", n);
       if (n > 0) {

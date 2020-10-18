@@ -84,51 +84,43 @@ void patterns_clean(void) {
 }
 
 // search_pattern returns index 0-n of pattern or -2 when no pattern matches
-int search_pattern(unsigned char *buf, size_t n) {
+int search_pattern(unsigned char ch) {
   /*
-  fprintf(stderr, "search pattern (%ld): '", n);
-  for (int i = 0; i < n; ++i) {
-    switch (buf[i]) {
-    case '\n':
-      fprintf(stderr, "\\n");
-      break;
-    default:
-      fprintf(stderr, "%c", buf[i]);
-      break;
-    }
+  switch (ch) {
+  case '\n':
+    fprintf(stderr, "\\n");
+    break;
+  default:
+    fprintf(stderr, "%c", ch);
+    break;
   }
-  fprintf(stderr, "'\n");
   */
 
-  for (int j = 0; j < n; ++j) {
-    for (listOfPatterns_t *elem = first(); elem != NULL; elem = elem->next) {
-      pattern_t *p = elem->pattern;
-      if (p->pattern[p->match_idx] == buf[j]) {
-        // fprintf(stderr, "character %c fits in pattern '%s', move forward
-        // ...", buf[j], p->pattern);
-        p->match_idx++;
-        if (p->pattern[p->match_idx] == '\0') {
-          // fprintf(stderr, "MATCH!\n");
-          j += strlen(p->pattern);
-          for (listOfPatterns_t *e = first(); e != NULL; e = e->next) {
-            e->pattern->match_idx = 0;
-          }
-          return p->id;
-        } else {
-          size_t l = p->match_idx;
-          while (p->pattern[l] != '\0') {
-            l++;
-          }
-          // fprintf(stderr, "still %ld characters must fit\n", l -
-          // p->match_idx);
+  for (listOfPatterns_t *elem = first(); elem != NULL; elem = elem->next) {
+    pattern_t *p = elem->pattern;
+    if (p->pattern[p->match_idx] == ch) {
+      // fprintf(stderr, "character %c fits in pattern '%s', move forward ...",
+      // ch, p->pattern);
+      p->match_idx++;
+      if (p->pattern[p->match_idx] == '\0') {
+        // fprintf(stderr, "MATCH!\n");
+        for (listOfPatterns_t *e = first(); e != NULL; e = e->next) {
+          e->pattern->match_idx = 0;
         }
+        return p->id;
       } else {
-        // fprintf(stderr, "character %c does not fit, pattern %s is out\n",
-        //        buf[j], p->pattern);
-        p->match_idx = 0;
+        size_t l = p->match_idx;
+        while (p->pattern[l] != '\0') {
+          l++;
+        }
+        // fprintf(stderr, "still %ld characters must fit\n", l - p->match_idx);
       }
+    } else {
+      // fprintf(stderr, "character %c does not fit, pattern %s is out\n",
+      //        buf[j], p->pattern);
+      p->match_idx = 0;
     }
   }
+
   return -2;
 }
-

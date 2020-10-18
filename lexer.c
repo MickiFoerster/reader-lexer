@@ -98,38 +98,14 @@ int lexer(void *token) {
         continue;
       }
 
-      int search_space_start = -1;
-      int search_space_end = -1;
-      size_t len = 0;
       for (;;) {
         size_t i = (this->reader->out + 1) %
                    (sizeof(this->reader->buf) / sizeof(this->reader->buf[0]));
-        if (i == this->reader->in) {
-          search_space_end = this->reader->out;
+        if (pattern_matches >= 0 || i == this->reader->in) {
           break;
         }
-        if (search_space_start == -1) {
-          search_space_start = i;
-        }
-        len++;
+        pattern_matches = search_pattern(this->reader->buf[i]);
         this->reader->out = i;
-      }
-
-      len *= sizeof(unsigned char);
-      unsigned char *buf = (unsigned char *)malloc(len);
-      size_t l = 0;
-      assert(buf);
-      if (buf) {
-        for (size_t i = search_space_start;;) {
-          buf[l] = this->reader->buf[i];
-          if (i == search_space_end)
-            break;
-          l++;
-          i = (i + 1) %
-              (sizeof(this->reader->buf) / sizeof(this->reader->buf[0]));
-        }
-        pattern_matches = search_pattern(buf, len);
-        free(buf);
       }
 
       pthread_cond_signal(&this->sync.condinput_fillable);
