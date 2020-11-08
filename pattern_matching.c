@@ -10,7 +10,6 @@
 typedef struct {
   int id;
   char *pattern;
-  bool regexp_started;
   int match_idx;
 } pattern_t;
 
@@ -84,34 +83,6 @@ void patterns_clean(void) {
   }
 }
 
-static short regexp_digit_current_state = 0;
-static void regexp_digit_init(void) {
-  fprintf(stderr, "init statemachine [0-9]\n");
-  regexp_digit_current_state = 0;
-}
-
-static bool regexp_digit_next(char ch) {
-  fprintf(stderr, "statemachine [0-9]: %c\n", ch);
-  if ('0' <= ch && ch <= '9') {
-    if (regexp_digit_current_state == 0) {
-      regexp_digit_current_state = 1;
-    } else {
-      regexp_digit_current_state = 1;
-    }
-    fprintf(stderr, "statemachine [0-9]: valid: state=%d\n",
-            regexp_digit_current_state);
-    return true;
-  }
-  regexp_digit_current_state = 0xFF;
-  fprintf(stderr, "statemachine [0-9]: invalid: state=%d\n",
-          regexp_digit_current_state);
-  return false;
-}
-
-static bool regexp_digit_valid(void) {
-  return (regexp_digit_current_state == 1);
-}
-
 // search_pattern returns index 0-n of pattern or -2 when no pattern matches
 int search_pattern(unsigned char ch) {
   /*
@@ -127,31 +98,7 @@ int search_pattern(unsigned char ch) {
 
   for (listOfPatterns_t *elem = first(); elem != NULL; elem = elem->next) {
     pattern_t *p = elem->pattern;
-    const char regexp_nonempty_digits[] = "[0-9]+";
-    if (p->pattern[p->match_idx] == regexp_nonempty_digits[0] &&
-        strlen(&p->pattern[p->match_idx]) >= strlen(regexp_nonempty_digits) &&
-        strncmp(&p->pattern[p->match_idx], regexp_nonempty_digits,
-                strlen(regexp_nonempty_digits)) == 0) {
-      if (!p->regexp_started) {
-        p->regexp_started = true;
-        regexp_digit_init();
-      }
-      bool valid = regexp_digit_valid();
-      bool ok = regexp_digit_next(ch);
-      if (!ok) {
-        if (valid) {
-          p->match_idx += strlen(regexp_nonempty_digits);
-          if (p->pattern[p->match_idx] == '\0') {
-            for (listOfPatterns_t *e = first(); e != NULL; e = e->next) {
-              e->pattern->match_idx = 0;
-            }
-            return p->id;
-          }
-        } else {
-          p->match_idx = 0;
-        }
-      }
-    } else if (p->pattern[p->match_idx] == ch) {
+    if (p->pattern[p->match_idx] == ch) {
       // fprintf(stderr, "character %c fits in pattern '%s', move forward ...",
       // ch, p->pattern);
       p->match_idx++;
@@ -161,6 +108,12 @@ int search_pattern(unsigned char ch) {
           e->pattern->match_idx = 0;
         }
         return p->id;
+      } else {
+        size_t l = p->match_idx;
+        while (p->pattern[l] != '\0') {
+          l++;
+        }
+        // fprintf(stderr, "still %ld characters must fit\n", l - p->match_idx);
       }
     } else {
       // fprintf(stderr, "character %c does not fit, pattern %s is out\n",
@@ -171,4 +124,3 @@ int search_pattern(unsigned char ch) {
 
   return -2;
 }
-
