@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <errno.h>
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -112,6 +113,8 @@ static void *reader_task(void *argv) {
     int nfds = epoll_wait(epfd, events, 2, reader->reader_timeout);
     switch (nfds) {
     case -1:
+      if (errno == EINTR)
+        continue;
       perror("epoll_wait() failed");
       close(reader->args.input);
       pthread_cond_signal(&reader->sync->cond_input_available);
