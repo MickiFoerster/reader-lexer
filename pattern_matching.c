@@ -96,24 +96,23 @@ int search_pattern(unsigned char ch) {
   }
   */
 
+  pattern_t *p;
   for (listOfPatterns_t *elem = first(); elem != NULL; elem = elem->next) {
-    pattern_t *p = elem->pattern;
-    if (p->pattern[p->match_idx] == ch) {
-      // fprintf(stderr, "character %c fits in pattern '%s', move forward ...",
-      // ch, p->pattern);
+    p = elem->pattern;
+    const char regexp_digit[] = "[0-9]";
+    if (p->pattern[p->match_idx] == regexp_digit[0] &&
+        strlen(&p->pattern[p->match_idx]) >= strlen(regexp_digit) &&
+        strncmp(&p->pattern[p->match_idx], regexp_digit,
+                strlen(regexp_digit)) == 0 &&
+        ('0' <= ch && ch <= '9')) {
+      p->match_idx += strlen(regexp_digit);
+      if (p->pattern[p->match_idx] == '\0') {
+        goto MATCH;
+      }
+    } else if (p->pattern[p->match_idx] == ch) {
       p->match_idx++;
       if (p->pattern[p->match_idx] == '\0') {
-        // fprintf(stderr, "MATCH!\n");
-        for (listOfPatterns_t *e = first(); e != NULL; e = e->next) {
-          e->pattern->match_idx = 0;
-        }
-        return p->id;
-      } else {
-        size_t l = p->match_idx;
-        while (p->pattern[l] != '\0') {
-          l++;
-        }
-        // fprintf(stderr, "still %ld characters must fit\n", l - p->match_idx);
+        goto MATCH;
       }
     } else {
       // fprintf(stderr, "character %c does not fit, pattern %s is out\n",
@@ -123,4 +122,10 @@ int search_pattern(unsigned char ch) {
   }
 
   return -2;
+MATCH:
+  // fprintf(stderr, "MATCH!\n");
+  for (listOfPatterns_t *e = first(); e != NULL; e = e->next) {
+    e->pattern->match_idx = 0;
+  }
+  return p->id;
 }
