@@ -64,6 +64,17 @@ void patterns_push_back(char *pattern, int id) {
   elem->next = new_elem;
 }
 
+char *patterns_get_pattern_from_ID(int id) {
+  listOfPatterns_t *elem = first();
+  while (elem != NULL) {
+    if (elem->pattern->id == id) {
+      return elem->pattern->pattern;
+    }
+    elem = elem->next;
+  }
+  return NULL;
+}
+
 void patterns_dump(void) {
   listOfPatterns_t *elem = first();
   while (elem != NULL) {
